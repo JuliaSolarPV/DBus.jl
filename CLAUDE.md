@@ -33,13 +33,6 @@ julia -e 'using JuliaFormatter; format(".")'
 pre-commit run -a
 ```
 
-### Documentation
-
-```bash
-# Build and serve docs locally with live reload
-julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); using LiveServer; servedocs()'
-```
-
 ## Architecture
 
 ```
@@ -69,4 +62,4 @@ All `ccall`s go through `Dbus_jll.libdbus`. Key design decisions:
 - **Branch naming**: `<issue-number>-<description>` (e.g., `42-add-feature`), prefixes for small changes (`typo-`, `hotfix-`)
 - **Commits**: Imperative/present tense ("Add feature", "Fix bug")
 - **CI coverage targets**: 90% project, 90% patch (codecov.yml)
-- **Workspace**: `Project.toml` declares workspace members `test` and `docs`
+- **Workspace**: `Project.toml` declares workspace member `test`
