@@ -6,6 +6,9 @@
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 [![tested with JET.jl](https://img.shields.io/badge/%F0%9F%9B%A9%EF%B8%8F_tested_with-JET.jl-233f9a)](https://github.com/aviatesk/JET.jl)
 
+> [!WARNING]
+> This package was generated with the help of Claude Code (claude.ai/code). It requires **Julia 1.12+**. The `DBusService` dispatch loop uses `Threads.@spawn` with blocking `ccall`s into libdbus, which only works reliably on Julia 1.12+ where the task scheduler properly handles concurrent C calls.
+
 DBus.jl is a pure-Julia interface to [D-Bus](https://www.freedesktop.org/wiki/Software/dbus/), the standard inter-process communication system on Linux. It uses [`Dbus_jll`](https://github.com/JuliaBinaryWrappers/Dbus_jll.jl) so no system `libdbus` installation is required.
 
 - **High-level API** -- `call_method`, `send_signal`, and a service dispatch loop

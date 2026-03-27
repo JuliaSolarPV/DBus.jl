@@ -7,7 +7,7 @@
 end
 
 @testitem "JET" tags = [:linting] begin
-    if v"1.12" <= VERSION < v"1.13"
+    if VERSION >= v"1.12"
         using JET: JET
         using DBus
 

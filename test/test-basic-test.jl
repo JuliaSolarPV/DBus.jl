@@ -246,7 +246,7 @@ end
 
 @testitem "Service round-trip: echo" tags = [:integration] setup = [DBusSetup] begin
     # Requires --threads≥2 (CI and local should use julia --threads=2)
-    @assert Threads.nthreads() >= 2 "Run with --threads=2"
+    @assert Threads.nthreads() >= 2 "Set JULIA_NUM_THREADS=2"
 
     svc_conn = DBusConnection(DBUS_BUS_SESSION; private = true)
     bus_name = "org.juliatest.DBusJl.echo.pid$(getpid())"
@@ -282,7 +282,7 @@ end
 end
 
 @testitem "Service round-trip: error reply" tags = [:integration] setup = [DBusSetup] begin
-    @assert Threads.nthreads() >= 2 "Run with --threads=2"
+    @assert Threads.nthreads() >= 2 "Set JULIA_NUM_THREADS=2"
 
     svc_conn = DBusConnection(DBUS_BUS_SESSION; private = true)
     bus_name = "org.juliatest.DBusJl.err.pid$(getpid())"
@@ -324,7 +324,7 @@ end
 end
 
 @testitem "Service round-trip: handler exception" tags = [:integration] setup = [DBusSetup] begin
-    @assert Threads.nthreads() >= 2 "Run with --threads=2"
+    @assert Threads.nthreads() >= 2 "Set JULIA_NUM_THREADS=2"
 
     svc_conn = DBusConnection(DBUS_BUS_SESSION; private = true)
     bus_name = "org.juliatest.DBusJl.exc.pid$(getpid())"
