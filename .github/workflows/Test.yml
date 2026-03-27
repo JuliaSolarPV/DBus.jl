@@ -25,10 +25,7 @@ jobs:
           - "lts"
           - "1"
         os:
-          - ubuntu-latest
-          - macOS-latest
-
-          - windows-latest
+          - ubuntu-latest  # Dbus_jll only supports Linux/FreeBSD
 
         arch:
           - x64
