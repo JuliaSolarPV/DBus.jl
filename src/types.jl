@@ -139,3 +139,34 @@ dbus_signature(::Type{UInt64}) = "t"
 dbus_signature(::Type{Float64}) = "d"
 dbus_signature(::Type{String}) = "s"
 dbus_signature(::Type{Vector{T}}) where {T} = "a" * dbus_signature(T)
+
+# ──────────────────────────────────────────────────────────────────
+# DBusVariant — wrapper for D-Bus variant type
+# ──────────────────────────────────────────────────────────────────
+
+"""
+    DBusVariant{T}
+
+Wrapper that marks a value for serialisation as a D-Bus variant (`v`).
+Venus OS / Victron Energy wraps all property values in variants.
+
+    DBusVariant(Int32(42))      # variant containing an int32
+    DBusVariant("hello")        # variant containing a string
+"""
+struct DBusVariant{T}
+    value::T
+end
+
+dbus_signature(::Type{<:DBusVariant}) = "v"
+dbus_signature(v::DBusVariant) = dbus_signature(typeof(v.value))
+
+# ──────────────────────────────────────────────────────────────────
+# Dict / Pair signatures
+# ──────────────────────────────────────────────────────────────────
+
+function _dict_entry_sig(::Type{K}, ::Type{V}) where {K,V}
+    return "{" * dbus_signature(K) * dbus_signature(V) * "}"
+end
+
+dbus_signature(::Type{Pair{K,V}}) where {K,V} = _dict_entry_sig(K, V)
+dbus_signature(::Type{Dict{K,V}}) where {K,V} = "a" * _dict_entry_sig(K, V)

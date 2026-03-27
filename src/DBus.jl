@@ -35,6 +35,7 @@ export DBusConnection,
     DBusMessage,
     DBusError,
     DBusService,
+    DBusVariant,
     # Constants — bus types
     DBUS_BUS_SESSION,
     DBUS_BUS_SYSTEM,

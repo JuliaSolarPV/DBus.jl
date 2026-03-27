@@ -113,6 +113,29 @@ reply = DBusMessage(reply_ptr; owns = true)
 reply_args = read_args(reply)
 println("Owner of org.freedesktop.DBus: ", reply_args[1])
 
+# ── 8. Variant and Dict round-trips (local, no bus needed) ────────
+
+println("\n=== Variant and Dict round-trips ===")
+
+# Variant wrapping different types
+msg_v = DBusMessage("org.test.X", "/org/test/X", "org.test.X", "Method")
+append_args!(msg_v, DBusVariant(Int32(3500)), DBusVariant("hello"), DBusVariant(true))
+v_args = read_args(msg_v)
+println("Variant(Int32):  ", v_args[1])
+println("Variant(String): ", v_args[2])
+println("Variant(Bool):   ", v_args[3])
+
+# Dict{String, DBusVariant} — the Venus OS / Victron Energy pattern
+msg_d = DBusMessage("org.test.X", "/org/test/X", "org.test.X", "Method")
+props = Dict(
+    "power" => DBusVariant(Int32(3500)),
+    "name" => DBusVariant("EV Charger"),
+    "connected" => DBusVariant(true),
+)
+append_args!(msg_d, props)
+d_args = read_args(msg_d)
+println("Dict{String,Variant}: ", d_args[1])
+
 # ── Done ──────────────────────────────────────────────────────────
 
 close(conn)

@@ -285,3 +285,83 @@ end
         close(svc_conn)
     end
 end
+
+# ──────────────────────────────────────────────────────────────────
+# Variant round-trips
+# ──────────────────────────────────────────────────────────────────
+
+@testitem "Round-trip: DBusVariant(Int32)" tags = [:unit, :fast] setup = [DBusSetup] begin
+    msg = DBusMessage("org.test.X", "/org/test/X", "org.test.X", "Method")
+    append_args!(msg, DBusVariant(Int32(42)))
+    args = read_args(msg)
+    @test length(args) == 1
+    @test args[1] isa DBusVariant
+    @test args[1].value === Int32(42)
+end
+
+@testitem "Round-trip: DBusVariant(String)" tags = [:unit, :fast] setup = [DBusSetup] begin
+    msg = DBusMessage("org.test.X", "/org/test/X", "org.test.X", "Method")
+    append_args!(msg, DBusVariant("hello"))
+    args = read_args(msg)
+    @test args[1] isa DBusVariant
+    @test args[1].value == "hello"
+end
+
+@testitem "Round-trip: DBusVariant(Bool)" tags = [:unit, :fast] setup = [DBusSetup] begin
+    msg = DBusMessage("org.test.X", "/org/test/X", "org.test.X", "Method")
+    append_args!(msg, DBusVariant(true))
+    args = read_args(msg)
+    @test args[1] isa DBusVariant
+    @test args[1].value === true
+end
+
+# ──────────────────────────────────────────────────────────────────
+# Dict round-trips
+# ──────────────────────────────────────────────────────────────────
+
+@testitem "Round-trip: Dict{String,String}" tags = [:unit, :fast] setup = [DBusSetup] begin
+    msg = DBusMessage("org.test.X", "/org/test/X", "org.test.X", "Method")
+    append_args!(msg, Dict("a" => "alpha", "b" => "beta"))
+    args = read_args(msg)
+    @test length(args) == 1
+    d = args[1]
+    @test d isa Dict
+    @test d["a"] == "alpha"
+    @test d["b"] == "beta"
+end
+
+@testitem "Round-trip: Dict{String,DBusVariant} (Venus OS pattern)" tags = [:unit, :fast] setup =
+    [DBusSetup] begin
+    msg = DBusMessage("org.test.X", "/org/test/X", "org.test.X", "Method")
+    append_args!(
+        msg,
+        Dict(
+            "power" => DBusVariant(Int32(3500)),
+            "name" => DBusVariant("EV Charger"),
+            "connected" => DBusVariant(true),
+        ),
+    )
+    args = read_args(msg)
+    @test length(args) == 1
+    d = args[1]
+    @test d isa Dict
+    @test d["power"].value === Int32(3500)
+    @test d["name"].value == "EV Charger"
+    @test d["connected"].value === true
+end
+
+@testitem "Round-trip: empty Dict" tags = [:unit, :fast] setup = [DBusSetup] begin
+    msg = DBusMessage("org.test.X", "/org/test/X", "org.test.X", "Method")
+    append_args!(msg, Dict{String,Int32}())
+    args = read_args(msg)
+    @test length(args) == 1
+    # Empty dict comes back as empty array (no dict entries to detect)
+    @test isempty(args[1])
+end
+
+@testitem "dbus_signature for variants and dicts" tags = [:unit, :fast] setup = [DBusSetup] begin
+    @test DBus.dbus_signature(DBusVariant{Int32}) == "v"
+    @test DBus.dbus_signature(Dict{String,Int32}) == "a{si}"
+    @test DBus.dbus_signature(Dict{String,DBusVariant{Int32}}) == "a{sv}"
+    @test DBus.dbus_signature(Pair{String,Int32}) == "{si}"
+end

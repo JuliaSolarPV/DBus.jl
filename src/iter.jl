@@ -123,6 +123,96 @@ function _append_arg!(ip::Ptr{Cvoid}, val::Vector{T}) where {T}
     return nothing
 end
 
+# ── DBusVariant{T} → D-Bus variant ────────────────────────────────
+
+function _append_arg!(ip::Ptr{Cvoid}, val::DBusVariant{T}) where {T}
+    sub_buf = _new_iter_buf()
+    sig = dbus_signature(T)
+    GC.@preserve sub_buf sig begin
+        sub_ip = _iter_ptr(sub_buf)
+        ret = ccall(
+            (:dbus_message_iter_open_container, libdbus),
+            Cuint,
+            (Ptr{Cvoid}, Cint, Cstring, Ptr{Cvoid}),
+            ip,
+            DBUS_TYPE_VARIANT,
+            sig,
+            sub_ip,
+        )
+        ret == 0 && error("dbus_message_iter_open_container failed")
+        _append_arg!(sub_ip, val.value)
+        ret = ccall(
+            (:dbus_message_iter_close_container, libdbus),
+            Cuint,
+            (Ptr{Cvoid}, Ptr{Cvoid}),
+            ip,
+            sub_ip,
+        )
+        ret == 0 && error("dbus_message_iter_close_container failed")
+    end
+    return nothing
+end
+
+# ── Dict{K,V} → D-Bus array of dict entries ──────────────────────
+
+function _append_dict_entry!(ip::Ptr{Cvoid}, key, value)
+    sub_buf = _new_iter_buf()
+    GC.@preserve sub_buf begin
+        sub_ip = _iter_ptr(sub_buf)
+        ret = ccall(
+            (:dbus_message_iter_open_container, libdbus),
+            Cuint,
+            (Ptr{Cvoid}, Cint, Ptr{Cvoid}, Ptr{Cvoid}),
+            ip,
+            DBUS_TYPE_DICT_ENTRY,
+            C_NULL,
+            sub_ip,
+        )
+        ret == 0 && error("dbus_message_iter_open_container failed")
+        _append_arg!(sub_ip, key)
+        _append_arg!(sub_ip, value)
+        ret = ccall(
+            (:dbus_message_iter_close_container, libdbus),
+            Cuint,
+            (Ptr{Cvoid}, Ptr{Cvoid}),
+            ip,
+            sub_ip,
+        )
+        ret == 0 && error("dbus_message_iter_close_container failed")
+    end
+    return nothing
+end
+
+function _append_arg!(ip::Ptr{Cvoid}, val::Dict{K,V}) where {K,V}
+    sub_buf = _new_iter_buf()
+    entry_sig = _dict_entry_sig(K, V)
+    GC.@preserve sub_buf entry_sig begin
+        sub_ip = _iter_ptr(sub_buf)
+        ret = ccall(
+            (:dbus_message_iter_open_container, libdbus),
+            Cuint,
+            (Ptr{Cvoid}, Cint, Cstring, Ptr{Cvoid}),
+            ip,
+            DBUS_TYPE_ARRAY,
+            entry_sig,
+            sub_ip,
+        )
+        ret == 0 && error("dbus_message_iter_open_container failed")
+        for (k, v) in val
+            _append_dict_entry!(sub_ip, k, v)
+        end
+        ret = ccall(
+            (:dbus_message_iter_close_container, libdbus),
+            Cuint,
+            (Ptr{Cvoid}, Ptr{Cvoid}),
+            ip,
+            sub_ip,
+        )
+        ret == 0 && error("dbus_message_iter_close_container failed")
+    end
+    return nothing
+end
+
 # ══════════════════════════════════════════════════════════════════
 # Reading arguments
 # ══════════════════════════════════════════════════════════════════
@@ -215,7 +305,6 @@ end
 
 function _read_array(ip::Ptr{Cvoid})
     sub_buf = _new_iter_buf()
-    result = Any[]
     GC.@preserve sub_buf begin
         sub_ip = _iter_ptr(sub_buf)
         ccall(
@@ -227,15 +316,51 @@ function _read_array(ip::Ptr{Cvoid})
         )
         elem_type =
             ccall((:dbus_message_iter_get_arg_type, libdbus), Cint, (Ptr{Cvoid},), sub_ip)
-        elem_type == DBUS_TYPE_INVALID && return result
+        elem_type == DBUS_TYPE_INVALID && return Any[]
+
+        # Dict: array of dict entries → Dict{Any,Any}
+        if elem_type == DBUS_TYPE_DICT_ENTRY
+            dict = Dict{Any,Any}()
+            while true
+                k, v = _read_dict_entry(sub_ip)
+                dict[k] = v
+                has_next =
+                    ccall(
+                        (:dbus_message_iter_next, libdbus), Cuint, (Ptr{Cvoid},), sub_ip
+                    )
+                has_next == 0 && break
+            end
+            return dict
+        end
+
+        # Regular array
+        result = Any[]
         while true
             push!(result, _read_arg(sub_ip))
             has_next =
                 ccall((:dbus_message_iter_next, libdbus), Cuint, (Ptr{Cvoid},), sub_ip)
             has_next == 0 && break
         end
+        return result
     end
-    return result
+end
+
+function _read_dict_entry(ip::Ptr{Cvoid})
+    sub_buf = _new_iter_buf()
+    GC.@preserve sub_buf begin
+        sub_ip = _iter_ptr(sub_buf)
+        ccall(
+            (:dbus_message_iter_recurse, libdbus),
+            Cvoid,
+            (Ptr{Cvoid}, Ptr{Cvoid}),
+            ip,
+            sub_ip,
+        )
+        key = _read_arg(sub_ip)
+        ccall((:dbus_message_iter_next, libdbus), Cuint, (Ptr{Cvoid},), sub_ip)
+        value = _read_arg(sub_ip)
+        return (key, value)
+    end
 end
 
 function _read_variant(ip::Ptr{Cvoid})
@@ -249,7 +374,7 @@ function _read_variant(ip::Ptr{Cvoid})
             ip,
             sub_ip,
         )
-        return _read_arg(sub_ip)
+        return DBusVariant(_read_arg(sub_ip))
     end
 end
 
