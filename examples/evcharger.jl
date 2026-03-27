@@ -56,9 +56,9 @@ function value_to_text(path::String, val)
     elseif occursin("Current", path)
         return "$(round(val; digits=1)) A"
     elseif path == "/Mode"
-        return ["Manual", "Auto", "Schedule"][val + 1]
+        return ["Manual", "Auto", "Schedule"][val+1]
     elseif path == "/Status"
-        return ["Disconnected", "Connected", "Charging", "Error"][val + 1]
+        return ["Disconnected", "Connected", "Charging", "Error"][val+1]
     elseif path == "/ChargingTime"
         return "$(val) s"
     else
@@ -152,8 +152,7 @@ function simulate_charging!()
         CHARGER_STATE["/Ac/Power"] = power
         CHARGER_STATE["/Ac/L1/Power"] = power
         CHARGER_STATE["/Current"] = current
-        CHARGER_STATE["/ChargingTime"] =
-            Int32(CHARGER_STATE["/ChargingTime"] + Int32(1))
+        CHARGER_STATE["/ChargingTime"] = Int32(CHARGER_STATE["/ChargingTime"] + Int32(1))
         CHARGER_STATE["/Ac/Energy/Forward"] =
             Float64(CHARGER_STATE["/Ac/Energy/Forward"] + power / 3600000.0)
     else
@@ -188,7 +187,9 @@ function main()
     println("\nService running. Query with:")
     println("  busctl --user call $bus_name /Ac/Power com.victronenergy.BusItem GetValue")
     println("  busctl --user call $bus_name / com.victronenergy.BusItem GetItems")
-    println("  busctl --user call $bus_name /SetCurrent com.victronenergy.BusItem SetValue v i 10")
+    println(
+        "  busctl --user call $bus_name /SetCurrent com.victronenergy.BusItem SetValue v i 10",
+    )
     println("\nPress Ctrl+C to stop.\n")
 
     # Run service loop with periodic simulation updates
@@ -218,8 +219,11 @@ function main()
 
         power = CHARGER_STATE["/Ac/Power"]
         energy = CHARGER_STATE["/Ac/Energy/Forward"]
-        status = ["Disconnected", "Connected", "Charging", "Error"][CHARGER_STATE["/Status"] + 1]
-        print("\r  Status: $status | Power: $(round(power; digits=0)) W | Energy: $(round(energy; digits=3)) kWh    ")
+        status =
+            ["Disconnected", "Connected", "Charging", "Error"][CHARGER_STATE["/Status"]+1]
+        print(
+            "\r  Status: $status | Power: $(round(power; digits=0)) W | Energy: $(round(energy; digits=3)) kWh    ",
+        )
     end
 
     close(conn)

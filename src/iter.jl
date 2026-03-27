@@ -325,9 +325,7 @@ function _read_array(ip::Ptr{Cvoid})
                 k, v = _read_dict_entry(sub_ip)
                 dict[k] = v
                 has_next =
-                    ccall(
-                        (:dbus_message_iter_next, libdbus), Cuint, (Ptr{Cvoid},), sub_ip
-                    )
+                    ccall((:dbus_message_iter_next, libdbus), Cuint, (Ptr{Cvoid},), sub_ip)
                 has_next == 0 && break
             end
             return dict
