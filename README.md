@@ -86,4 +86,4 @@ If you use DBus.jl in your work, please cite using the reference given in [CITAT
 
 ## Contributing
 
-If you want to make contributions of any kind, please first take a look at our [contributing guide](https://github.com/JuliaSolarPV/DBus.jl/blob/main/CONTRIBUTING.md).
+Contributions are welcome! Please open an [issue](https://github.com/JuliaSolarPV/DBus.jl/issues) or pull request on GitHub.
