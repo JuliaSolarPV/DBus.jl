@@ -44,8 +44,7 @@ export DBusConnection,
     DBUS_MESSAGE_TYPE_METHOD_RETURN,
     DBUS_MESSAGE_TYPE_ERROR,
     DBUS_MESSAGE_TYPE_SIGNAL,
-    # Connection
-    flush,
+    # Connection (flush is Base.flush, no export needed)
     read_write_dispatch,
     unique_name,
     request_name,

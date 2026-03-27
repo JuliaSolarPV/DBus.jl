@@ -3,6 +3,8 @@
 [![Test workflow status](https://github.com/JuliaSolarPV/DBus.jl/actions/workflows/Test.yml/badge.svg?branch=main)](https://github.com/JuliaSolarPV/DBus.jl/actions/workflows/Test.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/JuliaSolarPV/DBus.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/JuliaSolarPV/DBus.jl)
 [![Lint workflow Status](https://github.com/JuliaSolarPV/DBus.jl/actions/workflows/Lint.yml/badge.svg?branch=main)](https://github.com/JuliaSolarPV/DBus.jl/actions/workflows/Lint.yml?query=branch%3Amain)
+[![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+[![tested with JET.jl](https://img.shields.io/badge/%F0%9F%9B%A9%EF%B8%8F_tested_with-JET.jl-233f9a)](https://github.com/aviatesk/JET.jl)
 
 DBus.jl is a pure-Julia interface to [D-Bus](https://www.freedesktop.org/wiki/Software/dbus/), the standard inter-process communication system on Linux. It uses [`Dbus_jll`](https://github.com/JuliaBinaryWrappers/Dbus_jll.jl) so no system `libdbus` installation is required.
 
@@ -84,4 +86,4 @@ If you use DBus.jl in your work, please cite using the reference given in [CITAT
 
 ## Contributing
 
-If you want to make contributions of any kind, please first take a look at our [contributing guide](https://github.com/JuliaSolarPV/DBus.jl/blob/main/docs/src/90-contributing.md).
+If you want to make contributions of any kind, please first take a look at our [contributing guide](https://github.com/JuliaSolarPV/DBus.jl/blob/main/CONTRIBUTING.md).

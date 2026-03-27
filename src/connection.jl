@@ -108,7 +108,7 @@ end
 
 Block until all pending outgoing messages have been written to the socket.
 """
-function flush(conn::DBusConnection)
+function Base.flush(conn::DBusConnection)
     _check_conn(conn)
     ccall((:dbus_connection_flush, libdbus), Cvoid, (Ptr{Cvoid},), conn.ptr)
     return nothing
