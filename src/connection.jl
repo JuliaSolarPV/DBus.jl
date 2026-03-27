@@ -52,16 +52,33 @@ end
 # ── Constructors ──────────────────────────────────────────────────
 
 """
-    DBusConnection(bus_type::Integer)
+    DBusConnection(bus_type::Integer; private=false)
 
 Connect to a well-known bus. `bus_type` should be one of
 `DBUS_BUS_SESSION`, `DBUS_BUS_SYSTEM`, or `DBUS_BUS_STARTER`.
+
+When `private=true`, opens a dedicated connection via `dbus_bus_get_private`
+instead of the shared one. Use this when you need multiple independent
+connections to the same bus (e.g. a service + client in the same process).
 """
-function DBusConnection(bus_type::Integer)
-    ptr = with_dbus_error() do err
-        ccall((:dbus_bus_get, libdbus), Ptr{Cvoid}, (Cint, Ptr{Cvoid}), Cint(bus_type), err)
+function DBusConnection(bus_type::Integer; private::Bool = false)
+    if private
+        ptr = with_dbus_error() do err
+            ccall(
+                (:dbus_bus_get_private, libdbus),
+                Ptr{Cvoid},
+                (Cint, Ptr{Cvoid}),
+                Cint(bus_type),
+                err,
+            )
+        end
+        return DBusConnection(ptr; shared = false)
+    else
+        ptr = with_dbus_error() do err
+            ccall((:dbus_bus_get, libdbus), Ptr{Cvoid}, (Cint, Ptr{Cvoid}), Cint(bus_type), err)
+        end
+        return DBusConnection(ptr; shared = true)
     end
-    return DBusConnection(ptr; shared = true)
 end
 
 """

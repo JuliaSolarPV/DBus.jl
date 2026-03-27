@@ -11,14 +11,11 @@ DBus.jl is a pure-Julia D-Bus interface using `Dbus_jll` (no system libdbus requ
 ### Testing
 
 ```bash
-# Run all tests
-julia --project=. -e 'using Pkg; Pkg.test()'
-
-# Run tests with threads (needed for service round-trip test)
-julia --threads=2 --project=. -e 'using Pkg; Pkg.test()'
+# Run all tests (--threads=2 required for service round-trip tests)
+julia --threads=2 --project=. -e 'using Pkg; Pkg.test(; julia_args=`--threads=2`)'
 
 # Run tests interactively (uses TestItemRunner with @testitem macros)
-julia --project=. -e 'using TestItemRunner; @run_package_tests()'
+julia --threads=2 --project=. -e 'using TestItemRunner; @run_package_tests()'
 ```
 
 Tests use `@testitem` macros with tags (`:unit`, `:fast`, `:integration`, `:slow`). Integration tests require a running D-Bus session bus.

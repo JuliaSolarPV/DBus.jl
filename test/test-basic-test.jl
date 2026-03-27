@@ -244,46 +244,119 @@ end
     close(conn)
 end
 
-@testitem "Service round-trip" tags = [:integration, :slow] setup = [DBusSetup] begin
-    # This test requires Julia to be started with multiple threads
-    # (e.g. --threads=2) because both the service loop and the client
-    # call use blocking libdbus C calls.
-    if Threads.nthreads() < 2
-        @test_skip "requires --threads≥2"
-    else
-        svc_conn = DBusConnection(DBUS_BUS_SESSION)
-        bus_name = "org.juliatest.DBusJl.pid$(getpid())"
-        ret = request_name(svc_conn, bus_name)
-        @test ret == DBus.DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
+@testitem "Service round-trip: echo" tags = [:integration] setup = [DBusSetup] begin
+    # Requires --threads≥2 (CI and local should use julia --threads=2)
+    @assert Threads.nthreads() >= 2 "Run with --threads=2"
 
-        svc = DBusService(svc_conn)
-        register_object(
-            svc,
-            "/org/juliatest/Obj",
-            "org.juliatest.Iface",
-            "Echo" => (conn, msg, args) -> send_reply(conn, msg; args = tuple(args...)),
-        )
+    svc_conn = DBusConnection(DBUS_BUS_SESSION; private = true)
+    bus_name = "org.juliatest.DBusJl.echo.pid$(getpid())"
+    ret = request_name(svc_conn, bus_name)
+    @test ret == DBus.DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
 
-        # Run service on a separate OS thread
-        svc_task = Threads.@spawn run(svc)
-        sleep(0.2)
+    svc = DBusService(svc_conn)
+    register_object(
+        svc,
+        "/org/juliatest/Obj",
+        "org.juliatest.Iface",
+        "Echo" => (conn, msg, args) -> send_reply(conn, msg; args = tuple(args...)),
+    )
 
-        client = DBusConnection(DBUS_BUS_SESSION)
-        result = call_method(
-            client,
-            bus_name,
-            "/org/juliatest/Obj",
-            "org.juliatest.Iface",
-            "Echo";
-            args = (Int32(42), "hello"),
-        )
-        @test result[1] === Int32(42)
-        @test result[2] == "hello"
+    svc_task = Threads.@spawn run(svc)
+    sleep(0.2)
 
-        stop(svc)
-        close(client)
-        close(svc_conn)
+    client = DBusConnection(DBUS_BUS_SESSION)
+    result = call_method(
+        client,
+        bus_name,
+        "/org/juliatest/Obj",
+        "org.juliatest.Iface",
+        "Echo";
+        args = (Int32(42), "hello"),
+    )
+    @test result[1] === Int32(42)
+    @test result[2] == "hello"
+
+    stop(svc)
+    close(client)
+    close(svc_conn)
+end
+
+@testitem "Service round-trip: error reply" tags = [:integration] setup = [DBusSetup] begin
+    @assert Threads.nthreads() >= 2 "Run with --threads=2"
+
+    svc_conn = DBusConnection(DBUS_BUS_SESSION; private = true)
+    bus_name = "org.juliatest.DBusJl.err.pid$(getpid())"
+    ret = request_name(svc_conn, bus_name)
+    @test ret == DBus.DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
+
+    svc = DBusService(svc_conn)
+    # Handler that sends an explicit error reply
+    register_object(
+        svc,
+        "/org/juliatest/Obj",
+        "org.juliatest.Iface",
+        "Fail" =>
+            (conn, msg, args) -> send_error(
+                conn,
+                msg,
+                "org.juliatest.Error.TestFail",
+                "intentional failure",
+            ),
+    )
+
+    svc_task = Threads.@spawn run(svc)
+    sleep(0.2)
+
+    client = DBusConnection(DBUS_BUS_SESSION)
+    err = try
+        call_method(client, bus_name, "/org/juliatest/Obj", "org.juliatest.Iface", "Fail")
+        nothing
+    catch e
+        e
     end
+    @test err isa DBusError
+    @test err.name == "org.juliatest.Error.TestFail"
+    @test contains(err.message, "intentional failure")
+
+    stop(svc)
+    close(client)
+    close(svc_conn)
+end
+
+@testitem "Service round-trip: handler exception" tags = [:integration] setup = [DBusSetup] begin
+    @assert Threads.nthreads() >= 2 "Run with --threads=2"
+
+    svc_conn = DBusConnection(DBUS_BUS_SESSION; private = true)
+    bus_name = "org.juliatest.DBusJl.exc.pid$(getpid())"
+    ret = request_name(svc_conn, bus_name)
+    @test ret == DBus.DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
+
+    svc = DBusService(svc_conn)
+    # Handler that throws — service should catch and send error reply
+    register_object(
+        svc,
+        "/org/juliatest/Obj",
+        "org.juliatest.Iface",
+        "Boom" => (conn, msg, args) -> error("kaboom"),
+    )
+
+    svc_task = Threads.@spawn run(svc)
+    sleep(0.2)
+
+    client = DBusConnection(DBUS_BUS_SESSION)
+    err = try
+        call_method(client, bus_name, "/org/juliatest/Obj", "org.juliatest.Iface", "Boom")
+        nothing
+    catch e
+        e
+    end
+    @test err isa DBusError
+    @test err.name == "org.freedesktop.DBus.Error.Failed"
+    @test contains(err.message, "kaboom")
+
+    stop(svc)
+    close(client)
+    close(svc_conn)
 end
 
 # ──────────────────────────────────────────────────────────────────
@@ -364,4 +437,118 @@ end
     @test DBus.dbus_signature(Dict{String,Int32}) == "a{si}"
     @test DBus.dbus_signature(Dict{String,DBusVariant{Int32}}) == "a{sv}"
     @test DBus.dbus_signature(Pair{String,Int32}) == "{si}"
+end
+
+# ──────────────────────────────────────────────────────────────────
+# Coverage: dbus_signature for all basic types
+# ──────────────────────────────────────────────────────────────────
+
+@testitem "dbus_signature all types" tags = [:unit, :fast] setup = [DBusSetup] begin
+    @test DBus.dbus_signature(UInt8) == "y"
+    @test DBus.dbus_signature(Bool) == "b"
+    @test DBus.dbus_signature(Int16) == "n"
+    @test DBus.dbus_signature(UInt16) == "q"
+    @test DBus.dbus_signature(Int32) == "i"
+    @test DBus.dbus_signature(UInt32) == "u"
+    @test DBus.dbus_signature(Int64) == "x"
+    @test DBus.dbus_signature(UInt64) == "t"
+    @test DBus.dbus_signature(Float64) == "d"
+    @test DBus.dbus_signature(String) == "s"
+end
+
+# ──────────────────────────────────────────────────────────────────
+# Coverage: message accessors (sender, error_name, reply_serial)
+# ──────────────────────────────────────────────────────────────────
+
+@testitem "Message accessors: sender, error_name, reply_serial" tags = [:unit, :fast] setup =
+    [DBusSetup] begin
+    msg =
+        DBusMessage("org.example.Dest", "/org/example/Path", "org.example.Iface", "DoStuff")
+    # sender is nothing for a locally-created message
+    @test sender(msg) === nothing
+    # error_name is nothing for a method call
+    @test error_name(msg) === nothing
+    # reply_serial is 0 for a new message
+    @test reply_serial(msg) == 0
+end
+
+# ──────────────────────────────────────────────────────────────────
+# Coverage: with_dbus_error error path (actual DBusError thrown)
+# ──────────────────────────────────────────────────────────────────
+
+@testitem "with_dbus_error throws on bad bus" tags = [:unit, :fast] setup = [DBusSetup] begin
+    # Calling dbus_bus_get with an invalid bus type should trigger a DBusError
+    # But libdbus may abort instead. Safer: try connecting to an impossible address.
+    # Instead, test that call_method to a nonexistent service throws DBusError.
+    conn = DBusConnection(DBUS_BUS_SESSION)
+    @test_throws DBusError call_method(
+        conn,
+        "org.nonexistent.Service.r$(rand(UInt16))",
+        "/org/nonexistent/Path",
+        "org.nonexistent.Iface",
+        "NoSuchMethod",
+    )
+    close(conn)
+end
+
+# ──────────────────────────────────────────────────────────────────
+# Coverage: send_signal (integration)
+# ──────────────────────────────────────────────────────────────────
+
+@testitem "send_signal with args" tags = [:integration] setup = [DBusSetup] begin
+    conn = DBusConnection(DBUS_BUS_SESSION)
+    # Should not throw
+    send_signal(
+        conn,
+        "/org/test/Signal",
+        "org.test.Signal",
+        "TestSignal";
+        args = (Int32(1), "test"),
+    )
+    send_signal(conn, "/org/test/Signal", "org.test.Signal", "EmptySignal")
+    close(conn)
+end
+
+# ──────────────────────────────────────────────────────────────────
+# Coverage: flush and read_write_dispatch
+# ──────────────────────────────────────────────────────────────────
+
+@testitem "flush and read_write_dispatch" tags = [:integration] setup = [DBusSetup] begin
+    conn = DBusConnection(DBUS_BUS_SESSION)
+    # flush should not throw
+    flush(conn)
+    # read_write_dispatch with short timeout should return true (still connected)
+    @test read_write_dispatch(conn; timeout_ms = 10) == true
+    close(conn)
+end
+
+# ──────────────────────────────────────────────────────────────────
+# Coverage: call_method with args
+# ──────────────────────────────────────────────────────────────────
+
+@testitem "call_method with args: NameHasOwner" tags = [:integration] setup = [DBusSetup] begin
+    conn = DBusConnection(DBUS_BUS_SESSION)
+    result = call_method(
+        conn,
+        "org.freedesktop.DBus",
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+        "NameHasOwner";
+        args = ("org.freedesktop.DBus",),
+    )
+    @test length(result) == 1
+    @test result[1] isa DBusVariant || result[1] === true || result[1] === false
+    close(conn)
+end
+
+# ──────────────────────────────────────────────────────────────────
+# Coverage: request_name
+# ──────────────────────────────────────────────────────────────────
+
+@testitem "request_name" tags = [:integration] setup = [DBusSetup] begin
+    conn = DBusConnection(DBUS_BUS_SESSION)
+    name = "org.juliatest.coverage.pid$(getpid()).r$(rand(UInt16))"
+    ret = request_name(conn, name)
+    @test ret == DBus.DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
+    close(conn)
 end
