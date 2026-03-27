@@ -1,10 +1,14 @@
 name = "DBus"
 uuid = "8206a7f6-fe46-5e54-985f-16134a9bac66"
-authors = ["Stefan de Lange <langestefan@msn.com>"]
 version = "0.1.0"
+authors = ["Stefan de Lange <langestefan@msn.com>"]
 
 [workspace]
 projects = ["test", "docs"]
 
+[deps]
+Dbus_jll = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
+
 [compat]
+Dbus_jll = "1.16.2"
 julia = "1.10"

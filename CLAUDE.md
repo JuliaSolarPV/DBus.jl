@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-DBus.jl is a Julia package under the JuliaSolarPV organization, scaffolded with BestieTemplate.jl. Currently early-stage (v0.1.0). Requires Julia 1.10+.
+DBus.jl is a pure-Julia D-Bus interface using `Dbus_jll` (no system libdbus required). Provides connection management, message construction, argument serialization, synchronous method calls, signal emission, and a service dispatch loop. Linux/FreeBSD only. Requires Julia 1.10+.
 
 ## Common Commands
 
@@ -14,11 +14,14 @@ DBus.jl is a Julia package under the JuliaSolarPV organization, scaffolded with 
 # Run all tests
 julia --project=. -e 'using Pkg; Pkg.test()'
 
+# Run tests with threads (needed for service round-trip test)
+julia --threads=2 --project=. -e 'using Pkg; Pkg.test()'
+
 # Run tests interactively (uses TestItemRunner with @testitem macros)
 julia --project=. -e 'using TestItemRunner; @run_package_tests()'
 ```
 
-Tests use `@testitem` macros with tags (`:unit`, `:fast`, `:integration`, `:slow`, `:validation`). Shared setup uses `@testsnippet` and `@testmodule` blocks in `test/test-basic-test.jl`.
+Tests use `@testitem` macros with tags (`:unit`, `:fast`, `:integration`, `:slow`). Integration tests require a running D-Bus session bus.
 
 ### Formatting and Linting
 
@@ -39,10 +42,26 @@ julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); using 
 
 ## Architecture
 
-- `src/DBus.jl` — Main module, all exports defined here
-- `test/runtests.jl` — Test entry point using TestItemRunner
-- `test/test-basic-test.jl` — Test items with tag-based organization
-- `docs/make.jl` — Documenter.jl setup with automatic page discovery via `recursively_list_pages()`
+```
+src/
+├── DBus.jl         # module root — includes all files, exports public API
+├── types.jl        # C constants, type-code tables, Julia↔DBus mapping
+├── error.jl        # DBusError exception + with_dbus_error(f) helper
+├── connection.jl   # DBusConnection — connect, name, match rules
+├── message.jl      # DBusMessage — construction, field accessors
+├── iter.jl         # argument serialisation (append) and deserialisation (read)
+├── call.jl         # call_method, send_message, send_reply, send_error
+├── signal.jl       # send_signal
+└── service.jl      # DBusService, register_object, run dispatch loop
+```
+
+All `ccall`s go through `Dbus_jll.libdbus`. Key design decisions:
+
+- **Shared vs private connections**: `dbus_bus_get` returns shared connections that must NOT be closed (only unref'd). The `DBusConnection.shared` field tracks this.
+- **Bool widening**: D-Bus `dbus_bool_t` is 4 bytes (`Cuint`), not 1 byte. All Bool append/read goes through `Cuint` conversion.
+- **String append**: `dbus_message_iter_append_basic` for strings expects `const char**`. Pass `Ref(pointer(s))` with `GC.@preserve`.
+- **Iterator buffers**: `DBusMessageIter` is a stack-allocated C struct. We use `zeros(UInt8, 128)` buffers with `GC.@preserve` and convert `pointer(buf)` to `Ptr{Cvoid}`.
+- **Service dispatch loop**: `read_write_dispatch` is a blocking C call. Service round-trip tests require `Threads.@spawn` (multiple OS threads).
 
 ## Conventions
 
